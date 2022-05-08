@@ -12,6 +12,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Switch to `build` branch
+        run: git checkout -bf build
+
       - name: Node setup
         uses: actions/setup-node@v1
         with:
@@ -24,15 +27,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Commit changes to `build` branch
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: build
-          publish_dir: ./build
-
-      - name: Switch to `build` branch
-        run: git checkout build
+      - name: Cleanup
+        run: |
+          rm -rf .github
+          rm .gitignore
 
       - name: Publish using `npm publish`
         run: npm publish --access public
