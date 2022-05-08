@@ -24,6 +24,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Commit changes to `build` branch
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: build
+          publish_dir: ./build
+
+      - name: Switch to `build` branch
+        run: git checkout build
+
       - name: Publish using `npm publish`
         run: npm publish --access public
         env:
