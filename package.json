@@ -1,7 +1,7 @@
 {
   "name": "@valflrt/tree",
   "version": "1.0.0",
-  "description": "",
+  "description": "A simple tree maker npm module",
   "main": "src/index.ts",
   "scripts": {
     "build": "rm -rf build && npx tsc"
@@ -15,5 +15,16 @@
   "devDependencies": {
     "@types/node": "^17.0.31",
     "typescript": "^4.6.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valflrt/tree.git"
+  },
+  "keywords": [
+    "tree"
+  ],
+  "bugs": {
+    "url": "https://github.com/valflrt/tree/issues"
+  },
+  "homepage": "https://github.com/valflrt/tree#readme"
 }
