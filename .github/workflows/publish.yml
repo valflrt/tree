@@ -9,4 +9,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Node setup
+        uses: actions/setup-node@v1
+        with:
+          node-version: 17
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Clean install using `npm ci`
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish using `npm publish`
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
