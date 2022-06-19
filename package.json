@@ -1,6 +1,6 @@
 {
   "name": "@valflrt/tree",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A simple tree maker npm module",
   "type": "module",
   "main": "build/index.js",
