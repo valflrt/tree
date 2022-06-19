@@ -1,5 +1,5 @@
-import fs from "fs/promises";
-import path from "path";
+import fsAsync from "fs/promises";
+import pathProgram from "path";
 
 /**
  * Item types
@@ -7,15 +7,16 @@ import path from "path";
 export enum ItemTypes {
   Dir,
   File,
-  Unknown,
+  UnknownItem,
 }
 
 /**
  * Item type – Do not use for specific items. (`Dir | File | Unknown`)
  */
 export interface Item {
-  type: ItemTypes.Dir | ItemTypes.File | ItemTypes.Unknown;
+  type: ItemTypes.Dir | ItemTypes.File | ItemTypes.UnknownItem;
   path: string;
+  name: string;
 }
 
 /**
@@ -24,6 +25,7 @@ export interface Item {
 export interface File extends Item {
   type: ItemTypes.File;
   ext: string | null;
+  size: number;
 }
 
 /**
@@ -32,18 +34,21 @@ export interface File extends Item {
 export interface Dir extends Item {
   type: ItemTypes.Dir;
   items: ItemArray;
+  size: number;
 }
 
 /**
- * UnknownItem type – Used when the item is neither a File nor a Dir (example: symbolic links, ...)
+ * UnknownItem type – Used when the item is neither a File
+ * nor a Dir (example: symbolic links, ...)
  */
 export interface UnknownItem extends Item {
-  type: ItemTypes.Unknown;
+  type: ItemTypes.UnknownItem;
 }
 
+export type AnyItem = File | Dir | UnknownItem;
 export type ItemArray = (File | Dir | UnknownItem)[];
 
-export class Tree {
+export default class Tree {
   private _path: string;
 
   /**
@@ -57,37 +62,69 @@ export class Tree {
   /**
    * Returns an object representation of the tree
    */
-  public async toObject() {
+  public async toObject(): Promise<Dir> {
+    if ((await fsAsync.stat(this._path)).isFile())
+      throw new Error("Can't make file tree from a file !");
+
     let loopThroughDirectories = async (
       dirPath: string
-    ): Promise<ItemArray> => {
-      return await Promise.all(
+    ): Promise<{ size: number; items: ItemArray }> => {
+      let dir = await Promise.all(
         (
-          await fs.readdir(path.join(__dirname, dirPath), {
+          await fsAsync.readdir(dirPath, {
             withFileTypes: true,
           })
-        ).map(async (v) =>
-          v.isDirectory()
-            ? {
-                type: ItemTypes.Dir,
-                path: v.name,
-                items: await loopThroughDirectories(path.join(dirPath, v.name)),
-              }
-            : v.isFile()
-            ? {
-                type: ItemTypes.File,
-                path: v.name,
-                ext: path.extname(v.name) !== "" ? path.extname(v.name) : null,
-              }
-            : { type: ItemTypes.Unknown, path: v.name }
-        )
+        ).map<Promise<AnyItem>>(async (i) => {
+          let itemPath = pathProgram.join(dirPath, i.name);
+          if (i.isDirectory()) {
+            let { items, size } = await loopThroughDirectories(itemPath);
+            return {
+              type: ItemTypes.Dir,
+              path: itemPath,
+              name: i.name,
+              items,
+              size,
+            };
+          } else if (i.isFile())
+            return {
+              type: ItemTypes.File,
+              path: itemPath,
+              name: i.name,
+              ext:
+                pathProgram.extname(i.name) !== ""
+                  ? pathProgram.extname(i.name)
+                  : null,
+              size: (await fsAsync.stat(itemPath)).size,
+            };
+          else
+            return {
+              type: ItemTypes.UnknownItem,
+              path: itemPath,
+              name: i.name,
+            };
+        })
       );
+
+      return {
+        items: dir,
+        size: dir.reduce(
+          (acc, v) =>
+            v.type === ItemTypes.File || v.type === ItemTypes.Dir
+              ? acc + v.size
+              : acc,
+          0
+        ),
+      };
     };
 
+    let { items, size } = await loopThroughDirectories(this._path);
+
     return {
-      type: "dir",
-      path: path.normalize(this._path),
-      items: await loopThroughDirectories(this._path),
+      type: ItemTypes.Dir,
+      name: pathProgram.parse(this._path).name,
+      path: pathProgram.normalize(this._path),
+      items,
+      size,
     };
   }
 
@@ -101,7 +138,9 @@ export class Tree {
      */
     indentSize?: number;
     /**
-     * Bullet to put before file/dir names (don't forget to add a space) – Default is "- " – If `null` specified uses an empty string
+     * Bullet to put before file/dir names (don't forget to add a space)
+     * – Default is "- " – If `null` specified uses an
+     * empty string
      */
     bullet?: string | null;
   }) {
@@ -116,7 +155,7 @@ export class Tree {
 
           if (i.type === ItemTypes.Dir)
             return baseString.concat(
-              dir.items.length !== 0 ? "\n" : "",
+              i.items.length !== 0 ? "\n" : "",
               loopTroughObject(i.items, level + 1)
             );
           else return baseString;
@@ -125,10 +164,45 @@ export class Tree {
     };
 
     let dir = await this.toObject();
+    if (!dir) return null;
 
     return `${bullet}${dir.path}`.concat(
       dir.items.length !== 0 ? "\n" : "",
       loopTroughObject(dir.items)
     );
+  }
+
+  /**
+   * Returns a flat array representation of the tree
+   */
+  public async toFlatArray() {
+    let flatArray: ItemArray = [];
+
+    let loopTroughObject = (dir: Dir, level: number = 1) => {
+      dir.items.forEach((i) =>
+        i.type === ItemTypes.Dir
+          ? loopTroughObject(i, level + 1)
+          : flatArray.push(i)
+      );
+    };
+
+    loopTroughObject(await this.toObject());
+
+    return flatArray;
+  }
+
+  /**
+   * Returns the number of entries in the given Dir object
+   * @param dir Dir object
+   */
+  public static getNumberOfFiles(dir: Dir): number {
+    let loopThroughItems = (items: ItemArray): number =>
+      items.reduce<number>((acc, i) => {
+        if (i.type === ItemTypes.Dir) {
+          return acc + loopThroughItems(i.items);
+        } else if (i.type === ItemTypes.UnknownItem) return acc;
+        else return acc + 1;
+      }, 0);
+    return loopThroughItems(dir.items);
   }
 }
