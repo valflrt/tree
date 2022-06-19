@@ -14,12 +14,14 @@ jobs:
 
       - name: Switch to `build` branch
         run: git checkout -b build
-
       - name: Node setup
         uses: actions/setup-node@v1
         with:
           node-version: 17
           registry-url: "https://registry.npmjs.org"
+
+      - name: Set env
+        run: echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
       - name: Clean install using `npm ci`
         run: npm ci
@@ -33,6 +35,6 @@ jobs:
           rm .gitignore
 
       - name: Publish using `npm publish`
-        run: npm publish --access public
+        run: npm publish --access public --tag ${{ env.TAG }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
