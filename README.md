@@ -1,3 +1,3 @@
-# Tree
+# Tree (DEPRECATED)
 
 Creates directory trees.
